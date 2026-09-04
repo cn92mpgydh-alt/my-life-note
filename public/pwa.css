@@ -14,3 +14,8 @@
 .install-card b { font-family: "DM Serif Display", "Zen Kaku Gothic New", serif; font-size: 19px; letter-spacing: .04em; }
 .install-card small, .install-guide { color: color-mix(in srgb, var(--text) 75%, transparent); font-size: 12px; }
 .install-guide { margin: 18px 2px; line-height: 1.9; }
+
+/* 端末・テーマを問わず、アプリの外側はニュートラルな白で整えます。 */
+html, body {
+  background: #f8f8f6;
+}
