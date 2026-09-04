@@ -1,4 +1,4 @@
-const CACHE = 'my-life-note-v2';
+const CACHE = 'my-life-note-v3';
 const APP_FILES = ['/', '/index.html', '/styles.css', '/pwa.css', '/app.js', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', event => {
