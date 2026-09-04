@@ -49,6 +49,7 @@ let data = store.get();
 let tab = 'home';
 let month = new Date();
 let openedTheme = null;
+let deferredInstallPrompt = null;
 
 function applyTheme(){
   const colors = {...DEFAULT_COLORS,...(data.themeConfig?.colors || {})};
@@ -72,7 +73,7 @@ function readPhoto(form){
   const file = form.querySelector('input[type=file]')?.files[0];
   return file ? new Promise(resolve => {const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(file);}) : Promise.resolve('');
 }
-function layout(content){return `<div class="app"><header class="top"><div><div class="wordmark">MY LIFE NOTE</div><div class="date">MY LITTLE DIGITAL DIARY</div></div><div class="top-actions"><button class="icon-btn style-btn" data-open="customize" aria-label="着せ替え">✦</button><button class="icon-btn" data-action="menu" aria-label="メニュー">☰</button></div></header>${content}</div>`;}
+function layout(content){return `<div class="app"><header class="top"><div><div class="wordmark">MY LIFE NOTE</div><div class="date">MY LITTLE DIGITAL DIARY</div></div><div class="top-actions"><button class="icon-btn style-btn" data-open="customize" aria-label="着せ替え">✦</button><button class="icon-btn" data-action="app" aria-label="アプリとして使う">⌁</button><button class="icon-btn" data-action="menu" aria-label="メニュー">☰</button></div></header>${content}</div>`;}
 
 function wishCard(wish){return `<article class="card wish-card">${image(wish.photo)}<div class="veil"></div><div><span class="tag">${escape(wish.category)}</span><h3>${escape(wish.title)}</h3><p>${wish.done ? `叶った日 ${jpDate(wish.completedAt)}` : wish.due ? `叶えたい日 ${jpDate(wish.due)}` : 'いつか叶えたい'}</p></div></article>`;}
 function home(){
@@ -109,6 +110,7 @@ function render(){applyTheme();$('#app').innerHTML=({home,wish,calendar,journal,
 function bind(){
   document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{tab=button.dataset.tab;render();});
   document.querySelectorAll('[data-action=add],[data-action=menu]').forEach(button=>button.onclick=addMenu);
+  document.querySelector('[data-action=app]')?.addEventListener('click',appInstallGuide);
   document.querySelector('[data-action=addwish]')?.addEventListener('click',()=>wishForm());
   document.querySelector('[data-action=addevent]')?.addEventListener('click',()=>eventForm());
   document.querySelector('[data-action=addjournal]')?.addEventListener('click',()=>journalForm());
@@ -123,6 +125,14 @@ function bind(){
   $('#search')?.addEventListener('input',event=>document.querySelectorAll('#journal-list .item').forEach((item,index)=>item.hidden=!JSON.stringify(data.journals[index]).includes(event.target.value)));
 }
 function addMenu(){modal(`<button class="secondary" data-close>← 戻る</button><h2>何を追加しますか？</h2><div class="add-menu"><button data-add="wish"><span>◇</span>願いを追加</button><button data-add="goal"><span>☆</span>目標を追加</button><button data-add="event"><span>□</span>予定を追加</button><button data-add="journal"><span>✎</span>日記を書く</button><button data-add="place"><span>⌖</span>行きたい場所を追加</button><button data-add="memory"><span>✦</span>思い出を追加</button></div>`);document.querySelectorAll('[data-add]').forEach(button=>button.onclick=()=>{const action=button.dataset.add;close();({wish:()=>wishForm(),goal:goalPage,event:()=>eventForm(),journal:()=>journalForm(),place:placePage,memory:memoryForm})[action]();});}
+function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;}
+function appInstallGuide(){
+  if(isStandalone()) return modal(`<button class="secondary" data-close>← 戻る</button><h2>アプリとして利用中です</h2><p class="sub">My Life Note はホーム画面からいつでも開けます。</p><div class="footer-note">データはこの端末内に保存されています。機種変更の前には、今後追加予定のバックアップ機能をご利用ください。</div>`);
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const guide=ios ? `Safari画面下の共有ボタンを押して、「ホーム画面に追加」を選んでください。` : `ブラウザのメニューから「ホーム画面に追加」または「アプリをインストール」を選んでください。`;
+  modal(`<button class="secondary" data-close>← 戻る</button><h2>アプリとして使う</h2><p class="sub">ホーム画面に追加すると、次回からアプリのようにすぐ開けます。</p><div class="install-card"><img src="icon.svg" alt="My Life Note のアイコン"><div><b>My Life Note</b><br><small>わたしだけのデジタル手帳</small></div></div><p class="install-guide">${guide}</p>${deferredInstallPrompt?'<button class="primary" data-install>My Life Note を追加する</button>':''}<div class="footer-note">※ 入力した内容は、現在お使いの端末・ブラウザに保存されます。</div>`);
+  document.querySelector('[data-install]')?.addEventListener('click',async()=>{deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;close();});
+}
 
 function wishForm(wish={}){modal(`<button class="secondary" data-close>← 戻る</button><h2>${wish.id?'願いを編集':'願いを追加'}</h2><form class="form" id="wishform"><label>タイトル<input name="title" required value="${escape(wish.title)}" placeholder="例：ひとりで海を見に行く"></label><label>詳細<textarea name="detail" placeholder="どんな気持ちで叶えたい？">${escape(wish.detail)}</textarea></label><label>カテゴリー<select name="category">${CATEGORIES.map(category=>`<option ${wish.category===category?'selected':''}>${category}</option>`).join('')}</select></label><div class="row"><label>叶えたい日<input type="date" name="due" value="${wish.due||''}"></label><label>追加日<input type="date" name="created" value="${wish.created||today()}"></label></div>${fileInput()}<button class="primary">保存する</button></form>`);$('#wishform').onsubmit=async event=>{event.preventDefault();const form=event.target,values=Object.fromEntries(new FormData(form)),photo=await readPhoto(form);if(wish.id){Object.assign(wish,values);if(photo)wish.photo=photo;}else data.wishes.unshift({...values,id:id(),photo,done:false});close();save();};}
 function journalForm(journal={}){modal(`<button class="secondary" data-close>← 戻る</button><h2>${journal.id?'日記を編集':'日記を書く'}</h2><form class="form" id="journalform"><label>日付<input type="date" name="date" value="${journal.date||today()}" required></label><label>タイトル<input name="title" value="${escape(journal.title)}" placeholder="今日のこと"></label><label>本文<textarea name="body" placeholder="今の気持ちを自由に書いてね。">${escape(journal.body)}</textarea></label><label>気分</label><div class="moods">${['☀️','☺️','☁️','😌','🌙'].map(mood=>`<button type="button" class="mood ${journal.mood===mood?'selected':''}" data-mood="${mood}">${mood}</button>`).join('')}</div><input type="hidden" name="mood" value="${journal.mood||'☺️'}">${fileInput()}<button class="primary">日記を保存する</button></form>`);document.querySelectorAll('[data-mood]').forEach(button=>button.onclick=()=>{$('[name=mood]').value=button.dataset.mood;document.querySelectorAll('[data-mood]').forEach(item=>item.classList.toggle('selected',item===button));});$('#journalform').onsubmit=async event=>{event.preventDefault();const form=event.target,values=Object.fromEntries(new FormData(form)),photo=await readPhoto(form);if(journal.id){Object.assign(journal,values);if(photo)journal.photo=photo;}else data.journals.unshift({...values,id:id(),photo});close();save();};}
@@ -145,4 +155,7 @@ function customizePage(){
   $('[data-cancel-theme]').onclick=()=>close();
 }
 document.querySelector('.bottom-nav').addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;if(button.dataset.tab){tab=button.dataset.tab;render();}if(button.dataset.action==='add')addMenu();});
+window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); deferredInstallPrompt=event; });
+window.addEventListener('appinstalled', () => { deferredInstallPrompt=null; });
+if('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));
 render();

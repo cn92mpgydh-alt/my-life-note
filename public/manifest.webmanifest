@@ -1,0 +1,14 @@
+{
+  "name": "My Life Note",
+  "short_name": "My Life Note",
+  "description": "毎日開きたくなる、わたしだけのデジタル手帳",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f9f8",
+  "theme_color": "#94bec6",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
